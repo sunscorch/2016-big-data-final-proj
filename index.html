@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+        .zipcode path{
+          stroke: #fff;
+          stroke-linejoin: round;
+          opacity: 0.8;
+        }
+
+        div.mouseover{
+            position: absolute;
+            background: black;
+            background-color: rgba(0,0,0,0.5);
+            border: 1px solid #131313;
+            color: white;
+            padding: 5px 8px;
+            margin-left: 100px;
+            margin-top: 50px;
+            display: none;
+        }
+
+        .brush .extent {
+                          stroke: #fff;
+                          fill-opacity: 0.2;
+                          shape-rendering: crispEdges;
+                          }
+        #tempVis{
+                top: 0px;
+                left:850px;
+                width: 500px;
+                height: 150px;
+                position: absolute;
+            }
+    
+       #tempVis1{
+                top: 250px;
+                left:850px;
+                width: 500px;
+                height: 150px;
+                position: absolute;
+            }   
+        #tempVis2{
+                    top: 500px;
+                    left:850px;
+                    width: 500px;
+                    height: 150px;
+                    position: absolute;
+                }   
+        #bar123{
+              top:300px;
+              left:400px;
+              width 450px;
+              height: 200px;
+              position: absolute;
+            }
+        #fare{
+                top: 73px;
+                left:0px;
+                width: 300px;
+                height: 200px;
+                position: absolute;
+                margin-top: 30px;
+            }
+        #dis{
+              top:240px;
+              left:0px;
+              width 200px;
+              height: 100px;
+              position: absolute;
+              margin-top: 30px;
+            }
+         #myDiv{
+              width 200px;
+              height: 300px;
+              position: absolute;
+            }
+          #myDiv2{
+              width 200px;
+              left:400px;
+              height: 300px;
+              position: absolute;
+            }
+       
+</style>
+<body>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="http://d3js.org/queue.v1.min.js"></script>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.js"></script>
+<script src="plot_box.js"></script>
+<script src="plot_line.js"></script>
+<script src="Correlation.js"></script>
+<script src="plotBar.js"></script>
+<label>Month Selection</label>
+            <select id="sel-x">
+                <option value="1">1</option>
+            </select>
+    <label>Date</label>
+        <select id="date">
+            <option value="1">none</option>
+        </select>
+    </br>
+    <label>select weather affecting factor</label>
+        <select id="weather">
+            <option value="0">  </option>
+            <option value="1">tempeture</option>
+            <option value="2">visibility</option>
+            <option value="3">liquid precip</option>
+        </select>
+</br>
+    <label>time start</label><input id="min" type="number" value=0 size="5" width="=10px"></br>
+    <label>time end</label><input id="max" type="number" value=1 size="5">
+</br>
+    <button id="showPickUp">showTaxi pick up</button>
+    <button id="brush">startBrush</button>
+<div class="mouseover"></div>
+<div id="tempVis"></div>
+<div id="tempVis1"></div>
+<div id="tempVis2"></div>
+<div id="tempVis3"></div>
+<svg id="vis1"></svg>
+<div id="fare"></div>
+<div id="myDiv"></div>
+<div id="myDiv2"></div>
+<div id="dis"><div>
+<div id="psg"></div>
+<div id="bar123"</div>
+
+    </br>
+
+<script>
+    
+drawMap();
+hour = [];
+for(var i = 0; i<=23; i++){hour.push(i);}
+
+$(function(){
+    var $select = $("#date");
+    for (i=1;i<=31;i++){
+        $select.append($('<option></option>').val(i).html(i))
+    }
+});
+    
+$("#date").change(function(){
+                   var dateSel = $('#date').val();
+                   dateSel = "/sampledCSV/"+dateSel + ".csv";
+                 
+                   d3.csv(dateSel, function(result){
+                    dataloaded(result);
+                    console.log(data);
+                    // jquery to call drawCircle
+                   $("#showPickUp").click(function(){
+                                    drawCircle(data);
+                                });///update data
+                    });
+                });
+    
+    
+//plotLine();
+d3.csv("weather1.csv", function(result){
+    weatherDataLoad(result);
+     $("#date").change(function(){
+                    console.log(weatherData);
+                    plotWeather(weatherData);
+                    plotLine();
+                });///update data
+});
+
+function weatherDataLoad(result){
+    weatherData = result.map(function(d){
+        return {
+            month  : +d.Time.substr(4,2),
+            date   : +d.Time.substr(6,2),
+            time   : +d.Time.substr(8,2),
+            temp   : +(+d.TempPerHour).toFixed(2),
+            vsb    : +(+d.VSBPerHour).toFixed(2),
+            pcp    : d.PCP01PerHour=="None"?0:(+(+d.PCP01PerHour).toFixed(2))
+        }
+    })
+}
+
+d3.csv("taxi_avg.csv", function(result){
+    AvgLoad(result);
+    console.log(avgData);
+    $("#weather").change(function(){
+    getAvg(avgData);
+    console.log(avgDisList);
+    var selWeather = $('#weather').val();
+    console.log(selWeather);
+    var weatherOpt ;
+    if(selWeather == "1") {weatherOpt = tempList;}
+    if(selWeather == "2") {weatherOpt = vsbList;}
+    if(selWeather == "3") {weatherOpt = pcpList;}
+     var x = getPearsonCorrelation(weatherOpt, avgDisList);
+     var y = getPearsonCorrelation(weatherOpt, avgFareList);
+     var z = getPearsonCorrelation(weatherOpt,avgTipList);
+     var h = getPearsonCorrelation(weatherOpt, avgPsgCount);
+     list = [x, y, z, h];
+     console.log(list);
+     plotBar();
+});
+});
+function AvgLoad(result){
+    avgData = result.map(function(d){
+        return {
+            month  : +d.pickup_datetime.substr(4,2),
+            date   : +d.pickup_datetime.substr(6,2),
+            avgFare: +d.avgfare,
+            avgTip : +d.avgtip,
+            avgPsg : +d.avgpassenger,
+            avgDis : +d.avgtripdistance
+        }
+    }) 
+}
+
+    
+function dataloaded(result){
+   data = result.map(function(d){
+   return {
+        date      : +d.pickup_datetime.substr(6,2),
+        dayTime   : +d.pickup_datetime.substr(8,2),
+        fare      : +d.fare_amount,
+        tip       : +d.tip_amount,
+        distance  : +d.trip_distance,
+        pessCnt   : +d.passenger_count,
+        //temp      :  d.total_amount,
+        longitude : +d.pickup_longitude,
+        lattitude : +d.pickup_lattitude
+    }//return 
+     })//end of map
+}//end of dataloaded
+    
+function drawMap(){
+        width = 850;
+        height = 650;
+        var g; // this is the container that will hold the zips
+
+        projection = d3.geo.conicConformal()
+              .parallels([40 + 40 / 60, 41 + 2 / 60])
+              .scale(70001)
+              .rotate([74, -40 - 45 / 60]);
+
+        var path = d3.geo.path().projection(projection);
+
+            svg = d3.select("#vis1")
+            .attr("width", width)
+            .attr("height", height);
+
+        queue()
+            .defer(d3.json, "data/nyc-zip-code.json")
+            .await(ready);
+
+function getColor(d){
+	// set this color spectrum to be dependent
+	// on any parameter of your JSON!
+    return "lightblue";
+}
+
+function ready(error, map) {
+  g=svg.append("g")
+      .attr("class", "zipcode")
+    .selectAll("path")
+      .data(map.features)
+    .enter().append("path")
+      .attr("d", path)
+	  .style("fill",function(d){return getColor(d);})
+  	  .on("mouseover",mouseover)
+	  .on("mouseout",mouseout);
+    
+}
+
+function mouseover(d){
+	var text="NY"+d.properties["ZIP"];
+	// you can add any more information to the mouseover
+	// here, using data in your JSON
+	$(".mouseover").html(text);
+	$(".mouseover").css("display","inline");
+}
+
+function mouseout(){
+    d3.select("#arcSelection").remove();
+
+	$(".mouseover").text("");
+	$(".mouseover").css("display","none");
+}
+
+// moves the mouseover box whenever the mouse is moved.
+d3.select('html') // Selects the 'html' element
+  .on('mousemove', function()
+    {
+		var locs=d3.mouse(this);	// get the mouse coordinates
+
+		// add some padding
+		locs[0]+=15;
+		locs[1]+=5;
+
+		$("div.mouseover").css("margin-left",locs[0]);
+		$("div.mouseover").css("margin-top",locs[1]);
+    });
+
+}// end of drawMap
+    
+    
+// add circles to svg
+    function drawCircle(data){
+        
+        var selDate   = $('#date').val();
+            selDate   = parseInt(selDate);
+        
+        var timeStart = $('#min').val();
+            timeStart   = parseInt(timeStart);
+        
+        var timeEnd   = $('#max').val();
+            timeEnd   = parseInt(timeEnd);
+        
+        var circles = svg.selectAll("circle").data(data);
+            circles.enter().append("circle");
+        
+        addAllElement(data);
+        updateCircles = circles
+                    .attr("cx", function (d) {  
+                    if(d.date==selDate && d.dayTime>=timeStart && d.dayTime<=timeEnd){
+                    return projection([d.longitude, d.lattitude])[0];} })
+                    .attr("cy", function (d) {  
+                    if(d.date==selDate && d.dayTime>=timeStart && d.dayTime<=timeEnd){
+                    return projection([d.longitude, d.lattitude])[1];} })
+                    .attr("r", "1px")
+                    .attr("fill", "red");
+        
+        circles.exit().remove();
+    }
+    
+// brush
+    // jquery to call drawCircle
+ $("#brush").click(function(){
+                    startBrush();
+                });///update data
+    
+function startBrush(){
+    var scaleX = d3.scale.linear().range([0,width]);
+    var scaleY = d3.scale.linear().range([0,height]);
+    var defaultExtent = [[0, 0], [0,0]];
+    
+    var brushes = d3.svg.brush()
+                        .x(scaleX)
+                        .y(scaleY)
+                        .extent(defaultExtent)
+                        .on("brush", brushed);
+            
+    svg.append("g")
+       .attr("class","brush")
+       .call(brushes)
+       .call(brushes.event);
+    
+  
+    brushes.clear();
+}
+    
+    
+    function brushed(){
+                var selected = d3.select(".extent");
+                var sel_x1 = parseInt(selected.attr("x"));
+                var sel_x2 = parseInt(selected.attr("width")) + sel_x1;
+                var sel_y1 = parseInt(selected.attr("y"));
+                var sel_y2 = parseInt(selected.attr("height")) + sel_y1;
+                selFare = [];
+                selTip  = [];
+                selDistance = [];
+                selPsgCnt = [];
+                
+                updateCircles.each(function(el){
+                    var selected_DOM = d3.select(this);
+                    var selected_cx = parseInt(selected_DOM.attr("cx")); 
+                    var selected_cy = parseInt(selected_DOM.attr("cy"));
+                    
+                    if ((sel_x2 >= selected_cx &&  selected_cx >= sel_x1) && (sel_y2 >= selected_cy &&  selected_cy >= sel_y1)){
+                        selFare.push(el.fare);
+                        selTip.push(el.tip);
+                        selDistance.push(el.distance);
+                        selPsgCnt.push(el.pessCnt)
+                    }
+                
+                });
+          plot_box();
+    }
+    
+    function addAllElement(data){
+        allFare = [];
+        allTip = [];
+        allDis = [];
+        allPsg = [];
+        var selDate   = $('#date').val();
+            selDate   = parseInt(selDate);
+        
+       var dataInDay = data.filter(function(d){
+           if(d.date == selDate) {
+               return d;
+           }});
+        console.log(dataInDay.length);
+        for(var i = 0; i<dataInDay.length; i++){
+            allFare.push(data[i].fare);
+            allTip.push(data[i].tip);
+            allDis.push(data[i].distance);
+            allPsg.push(data[i].pessCnt);
+        }
+        console.log(allDis)
+        }
+        
+   
+    function plotWeather(data){
+        tempList = [];
+        vsbList  = [];
+        pcpList  = [];
+        
+        var selDate   = $('#date').val();
+            selDate   = parseInt(selDate);
+        
+       var selMonth = $('#sel-x').find(":selected").val();
+           selMonth = parseInt(selMonth);
+        
+         var dataInDay = data.filter(function(d){
+           if(d.date == selDate &&  d.month == selMonth) {
+               return d;
+           }});
+        
+         for(var i = 0; i<dataInDay.length; i++){
+             tempList.push(dataInDay[i].temp);
+             vsbList.push(dataInDay[i].vsb);
+             pcpList.push(dataInDay[i].pcp);
+         }
+        //console.log(tempList);
+    }
+    
+    function getAvg(data){
+        avgFareList = []
+        avgTipList  = []
+        avgDisList  = []
+        avgPsgCount = []
+        
+        
+        var selDate   = $('#date').val();
+            selDate   = parseInt(selDate);
+        
+       var selMonth = $('#sel-x').find(":selected").val();
+           selMonth = parseInt(selMonth);
+        var dataInDay = data.filter(function(d){
+           if(d.date == selDate &&  d.month == selMonth) {
+               return d;
+           }});
+        for(var i = 0; i<dataInDay.length; i++){
+             avgFareList.push(dataInDay[i].avgFare);
+             avgTipList.push(dataInDay[i].avgTip);
+             avgDisList.push(dataInDay[i].avgDis);
+             avgPsgCount.push(dataInDay[i].avgPsg);
+         }
+        
+    }
+   
+        
+
+</script>
